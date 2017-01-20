@@ -27,9 +27,6 @@ idmotifs <- function(g){
 
 t0 <- Sys.time()
 mlst <- getmotlst(tatoosh)
-test <- sapply(mlst, function(x) idmotifs(graph.adjacency(abs(x))))
-dim(test)
-rowSums(test)
 t1 <- Sys.time()
 t1-t0
 
@@ -45,9 +42,10 @@ plot(graph.adjacency(abs(s2)))
 el2i <- get.edgelist(graph.adjacency(abs(s1)))
 el3i <- get.edgelist(graph.adjacency(abs(s2)))
 
-inames <- c("competition", "mutualism", "predation", "ammensalism", "commensalism")
+inames <- c("competition", "mutualism", "predation", "predation.alt", "ammensalism", "ammensalism.alt", "commensalism", "commensalism.alt", "none")
 i3opts <- expand.grid(inames, inames, inames)
 i2opts <- expand.grid(inames, inames)
+i3opts <- i3opts[!apply(i3opts, 1, function(x) sum(x == "none")) >= 2,]
 
 isign <- function(x){
   if(x == "competition"){
@@ -60,32 +58,29 @@ isign <- function(x){
     return(c(0, -1))
   }else if(x == "commensalism"){
     return(c(0, 1))
+  }else if(x == "predation.alt"){
+    return(c(-1, 1))
+  }else if(x == "ammensalism.alt"){
+    return(c(-1, 0))
+  }else if(x == "commensalism.alt"){
+    return(c(1, 0))
+  }else if(x == "none"){
+    return(c(0, 0))
   }
 }
 
 
 glist <- list()
-for(i in 1:nrow(i2opts)){
-  el2s <- cbind(el2i, 0)
-  el2s[1:2, 3] <- isign(i2opts[i,1])
-  el2s[3:4, 3] <- isign(i2opts[i,2])
-  
-  glist[[i]] <- el2s
-}
-
-glist2 <- list()
 for(i in 1:nrow(i3opts)){
   el3s <- cbind(el3i, 0)
   el3s[c(1,3), 3] <- isign(i3opts[i,1])
   el3s[c(2,5), 3] <- isign(i3opts[i,2])
   el3s[c(4,6), 3] <- isign(i3opts[i,3])
   
-  glist2[[i]] <- el3s
+  glist[[i]] <- el3s
 }
 
-glist
-
-i2list <- lapply(glist, function(x){
+i3list <- lapply(glist, function(x){
   m <- matrix(0, nrow = 3, ncol = 3)
   for(y in 1:nrow(x)){
     m[x[y,1], x[y,2]] <- x[y,3]
@@ -93,41 +88,26 @@ i2list <- lapply(glist, function(x){
   return(m)
 })
 
-i2list.iso <- lapply(i2list, t)
 
-i3list <- lapply(glist2, function(x){
-  m <- matrix(0, nrow = 3, ncol = 3)
-  for(y in 1:nrow(x)){
-    m[x[y,1], x[y,2]] <- x[y,3]
-  }
-  return(m)
-})
 
-i3list.iso <- lapply(i3list, t)
-
-sgl1 <- t(sapply(c(i2list, i3list), as.vector))
-sgl2 <- t(sapply(c(i2list.iso, i3list.iso), as.vector))
+sgl <- t(sapply(i3list, as.vector))
 
 
 tatmotv <- t(sapply(mlst, as.vector))
 tatmotv <- apply(tatmotv, 1, paste0, collapse = ",")
 
-isoA <- apply(sgl1, 1, paste0, collapse = ",")
-isoB <- apply(sgl2, 1, paste0, collapse = ",")
+isoA <- apply(sgl, 1, paste0, collapse = ",")
 
 id <- c()
 for(i in 1:length(tatmotv)){
-   wA <- isoA %in% tatmotv[15]
-   wB <- isoB %in% tatmotv[i]
-   
+   wA <- isoA %in% tatmotv[i]
+
    if(any(wA)){
      id[i] <- which(wA)
-   }else if(any(wB)){
-     id[i] <- which(wB)
    }else{
      id[i] <- NA
    }
 }
 
 sum(is.na(id))
-which(is.na(id[1:20]))
+

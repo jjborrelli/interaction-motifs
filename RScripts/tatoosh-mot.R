@@ -1,6 +1,8 @@
 library(igraph)
+library(NetIndices)
+library(deSolve)
 
-tatoosh <- read.csv("C:/Users/jjborrelli/Desktop/GitHub/rKeystone/tatoosh.csv", header = F)
+tatoosh <- read.csv("./data/tatoosh.csv", header = F)
 tatoosh <- as.matrix(tatoosh)
 
 getmotlst <- function(adj){
@@ -111,3 +113,116 @@ for(i in 1:length(tatmotv)){
 
 sum(is.na(id))
 
+#########################################################
+#########################################################
+#########################################################
+
+tmot <- as.numeric(names(table(id)))
+plot(as.vector(table(id)), sapply(lapply(alleq, "[[", 1), mean)[tmot])
+
+#########################################################
+#########################################################
+#########################################################
+
+# Basic Lotka-Volterra model
+lvmod <- function(times, state, parms){
+  with(as.list(c(state, parms)), {
+    dB <- state * parms$alpha + state * parms$m %*% state 
+    
+    list(dB)
+  })
+}
+
+# Function to detect extinction (prevents negative abundances)
+ext1 <- function (times, states, parms){
+  with(as.list(states), {
+    states[states < 10^-5] <- 0 
+   
+    return(c(states))
+  })
+}
+
+ext2 <- function (times, states, parms){
+  with(as.list(states), {
+    states[states <= 10^-10] <- 0
+    
+    states <- states + states * (rbeta(1, .3, 6)*sample(c(-1,1), 1))
+    
+    return(c(states))
+  })
+}
+
+sim_community <- function(times, state, parms, eq = lvmod, ex = ext1){
+  out <- ode(state, times, parms = parms, func = eq, events = list(func = ex, time =  times))
+  return(out[,-1])
+}
+
+ran.unif <- function(motmat){
+  newmat <- apply(motmat, c(1,2), function(x){
+    if(x==1){runif(1, 0, 1)}else if(x==-1){runif(1, -1, 0)} else{0}
+  })
+  diag(newmat) <- -1 #runif(1, -1, 0)
+  return(newmat)
+}
+
+eqS <- function(mat, iter, extf = ext1){
+  eq <- c()
+  plist <- list()
+  for(i in 1:iter){
+    cond <- FALSE
+    while(!cond){
+      istate <- runif(3, 0, 1)
+      igr <- runif(3, .1, 1)
+      par <- list(alpha = igr, m = ran.unif(mat))
+      
+      sc <- sim_community(1:1000, istate, par, ex = extf)
+      
+      cond <- nrow(sc) == 1000
+    }
+    plist[[i]] <- cbind(alpha = par$alpha, par$m) 
+    eq[i] <- ifelse(nrow(sc) == 1000,sum(sc[1000,] != 0), NA)
+  }
+  return(list(eq, plist))
+}
+
+t0 <- Sys.time()
+#alleq <- lapply(i3list, eqS, iter = 1000)
+alleq <- list()
+for(i in 1:length(i3list)){
+  alleq[[i]] <- eqS(i3list[[i]], iter = 1000, extf = ext1)
+  cat(rep(c(i, "\n"), 10))
+}
+t1 <- Sys.time()
+t1-t0
+
+
+tA <- Sys.time()
+#alleq <- lapply(i3list, eqS, iter = 1000)
+alleq1 <- list()
+for(i in 1:length(i3list)){
+  alleq1[[i]] <- eqS(i3list[[i]], iter = 1000, extf = ext2)
+  cat(rep(c(i, "\n"), 10))
+}
+tB <- Sys.time()
+tB-tA
+
+
+
+
+qstab <- sapply(lapply(alleq, "[[", 1), function(x) sum(x == 3)/1000)
+mab <- table(id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+# save.image("D://jjborrelli/motifINTS/neq-tri-int.Rdata")
+# load("D://jjborrelli/motifINTS/neq-tri-int.Rdata")
